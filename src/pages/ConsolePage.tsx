@@ -624,13 +624,14 @@ export function ConsolePage() {
           className="content-title"
           style={{
             display: "flex",
-            justifyContent: "center",
+            justifyContent: "space-between",
             alignItems: "center",
             height: "100px",
             backgroundColor: "black",
           }}
         >
-          <span style={{ fontWeight: "bold", fontSize: "24px" }}>Visyfy</span>
+          <span style={{ fontWeight: "bold", fontSize: "24px", marginLeft: "20px" }}>Visyfy</span>
+
 
         </div>
         <div className="content-actions">
