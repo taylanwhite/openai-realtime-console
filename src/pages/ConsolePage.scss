@@ -8,7 +8,8 @@
   flex-direction: column;
   overflow: hidden;
   margin: 0px 8px;
-  & > div {
+
+  &>div {
     flex-shrink: 0;
   }
 
@@ -21,11 +22,13 @@
     align-items: center;
     padding: 8px 16px;
     min-height: 40px;
+
     .content-title {
       flex-grow: 1;
       display: flex;
       align-items: center;
       gap: 12px;
+
       img {
         width: 24px;
         height: 24px;
@@ -40,21 +43,25 @@
     display: flex;
     overflow: hidden;
     margin-bottom: 24px;
+
     .content-block {
       position: relative;
       display: flex;
       flex-direction: column;
       max-height: 100%;
       width: 100%;
+
       .content-block-title {
         flex-shrink: 0;
         padding-top: 16px;
         padding-bottom: 4px;
         position: relative;
+
         .cost {
           float: right;
         }
       }
+
       .content-block-body {
         color: #6e6e7f;
         position: relative;
@@ -63,11 +70,17 @@
         padding-top: 4px;
         line-height: 1.2em;
         overflow: auto;
+        /* Allows scrolling when content overflows */
+        max-height: 300px;
+        /* Restricts height to 300px */
+
         &.full {
           padding: 0px;
         }
       }
+
     }
+
     .content-right {
       width: 300px;
       flex-shrink: 0;
@@ -75,12 +88,14 @@
       flex-direction: column;
       margin-left: 24px;
       gap: 24px;
-      & > div {
+
+      &>div {
         border-radius: 16px;
         flex-grow: 1;
         flex-shrink: 0;
         overflow: hidden;
         position: relative;
+
         .content-block-title {
           position: absolute;
           display: flex;
@@ -96,6 +111,7 @@
           z-index: 9999;
           text-align: center;
           white-space: pre;
+
           &.bottom {
             top: auto;
             bottom: 16px;
@@ -103,26 +119,35 @@
           }
         }
       }
-      & > div.kv {
+
+      &>div.kv {
         height: 250px;
         max-height: 250px;
         white-space: pre;
         background-color: #ececf1;
+
         .content-block-body {
           padding: 16px;
           margin-top: 56px;
+          overflow: auto;
+          /* Allows scrolling when content overflows */
+          max-height: 300px;
+          /* Restricts height to 300px */
         }
       }
     }
+
     .content-logs {
       flex-grow: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      & > div {
+
+      &>div {
         flex-grow: 1;
       }
-      & > .content-actions {
+
+      &>.content-actions {
         flex-grow: 0;
         flex-shrink: 0;
         display: flex;
@@ -130,12 +155,15 @@
         justify-content: center;
         gap: 16px;
       }
-      & > div.events {
+
+      &>div.events {
         overflow: hidden;
       }
+
       .events {
         border-top: 1px solid #e7e7e7;
       }
+
       .conversation {
         display: flex;
         flex-shrink: 0;
@@ -154,9 +182,11 @@
     display: flex;
     gap: 16px;
     margin-bottom: 16px;
+
     &:not(:hover) .close {
       display: none;
     }
+
     .close {
       position: absolute;
       top: 0px;
@@ -167,15 +197,18 @@
       border-radius: 16px;
       padding: 2px;
       cursor: pointer;
+
       &:hover {
         background: #696969;
       }
+
       svg {
         stroke-width: 3;
         width: 12px;
         height: 12px;
       }
     }
+
     .speaker {
       position: relative;
       text-align: left;
@@ -183,13 +216,16 @@
       width: 80px;
       flex-shrink: 0;
       margin-right: 16px;
+
       &.user {
         color: #0099ff;
       }
+
       &.assistant {
         color: #009900;
       }
     }
+
     .speaker-content {
       color: #18181b;
       overflow: hidden;
@@ -203,6 +239,7 @@
     display: flex;
     padding: 0px;
     gap: 16px;
+
     .event-timestamp {
       text-align: left;
       gap: 8px;
@@ -211,36 +248,45 @@
       flex-shrink: 0;
       margin-right: 16px;
     }
+
     .event-details {
       display: flex;
       flex-direction: column;
       color: #18181b;
       gap: 8px;
+
       .event-summary {
         padding: 4px 8px;
         margin: 0px -8px;
+
         &:hover {
           border-radius: 8px;
           background-color: #f0f0f0;
         }
+
         cursor: pointer;
         display: flex;
         gap: 8px;
         align-items: center;
+
         .event-source {
           flex-shrink: 0;
           display: flex;
           align-items: center;
           gap: 8px;
+
           &.client {
             color: #0099ff;
           }
+
           &.server {
             color: #009900;
           }
+
           &.error {
             color: #990000;
           }
+
           svg {
             stroke-width: 3;
             width: 12px;
@@ -260,6 +306,7 @@
     border-radius: 16px;
     z-index: 10;
     gap: 2px;
+
     .visualization-entry {
       position: relative;
       display: flex;
@@ -267,12 +314,15 @@
       height: 40px;
       width: 100px;
       gap: 4px;
+
       &.client {
         color: #0099ff;
       }
+
       &.server {
         color: #009900;
       }
+
       canvas {
         width: 100%;
         height: 100%;

@@ -6,18 +6,19 @@
   cursor: pointer;
   overflow: hidden;
 
-  background-color: #ececf1;
-  color: #101010;
+  background-color: black; /* Set black background */
+  color: white; /* Set white text */
   height: 40px;
   border-radius: 1000px;
+  border: 2px solid blue; /* Add blue border */
 
   &:hover {
-    background-color: #d8d8d8;
+    background-color: #222222; /* Optional: Darker shade on hover */
   }
 
   div.label {
     position: relative;
-    color: #666;
+    color: white; /* Set white text color */
     transition: color 0.1s ease-in-out;
     padding: 0px 16px;
     z-index: 2;
@@ -29,7 +30,7 @@
   }
 
   .toggle-background {
-    background-color: #101010;
+    background-color: blue; /* Set background for the toggle indicator */
     position: absolute;
     top: 0px;
     left: 0px;
@@ -42,13 +43,13 @@
 
   &[data-enabled='true'] {
     div.label.right {
-      color: #fff;
+      color: white; /* Ensure right label is white when enabled */
     }
   }
 
   &[data-enabled='false'] {
     div.label.left {
-      color: #fff;
+      color: white; /* Ensure left label is white when disabled */
     }
   }
 }

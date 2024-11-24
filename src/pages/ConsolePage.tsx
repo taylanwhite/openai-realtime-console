@@ -12,6 +12,7 @@ const LOCAL_RELAY_SERVER_URL: string =
   process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+import axiosInstance from '../axiosConfig';
 
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
@@ -26,6 +27,9 @@ import { Map } from '../components/Map';
 
 import './ConsolePage.scss';
 import { isJsxOpeningLikeElement } from 'typescript';
+import visyfyLogo from '../assets/visyfy_logo.png';
+import rippleAnimationBlack from '../assets/ripple_animation_black.svg';
+
 
 /**
  * Type for result from get_weather() function call
@@ -70,8 +74,8 @@ export function ConsolePage() {
   const apiKey = LOCAL_RELAY_SERVER_URL
     ? ''
     : localStorage.getItem('tmp::voice_api_key') ||
-      prompt('OpenAI API Key') ||
-      '';
+    prompt('OpenAI API Key') ||
+    '';
   if (apiKey !== '') {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }
@@ -93,9 +97,9 @@ export function ConsolePage() {
       LOCAL_RELAY_SERVER_URL
         ? { url: LOCAL_RELAY_SERVER_URL }
         : {
-            apiKey: apiKey,
-            dangerouslyAllowAPIKeyInBrowser: true,
-          }
+          apiKey: apiKey,
+          dangerouslyAllowAPIKeyInBrowser: true,
+        }
     )
   );
 
@@ -132,6 +136,8 @@ export function ConsolePage() {
     lng: -122.418137,
   });
   const [marker, setMarker] = useState<Coordinates | null>(null);
+  const [defaultView, setConversationView] = useState<boolean>(false);
+  const [visyfyIconHovered, setVisyfyIconHovered] = useState(false);
 
   const [usage, setUsage] = useState<UsageTotal>({
     input_audio_tokens: 0,
@@ -200,8 +206,9 @@ export function ConsolePage() {
     client.sendUserMessageContent([
       {
         type: `input_text`,
-        text: `Hello!`,
-        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+        // text: `Hello!`,
+        text: `Your job is to ask the case phone number, and then communicate back and forth with the user while they ask questions about the case. 
+        Your first message to the client should be a kind greeting, asking them how they are doing. When you get their phone number, remember to save it in memory to use in the future`
       },
     ]);
 
@@ -253,6 +260,10 @@ export function ConsolePage() {
    */
   const startRecording = async () => {
     setIsRecording(true);
+    if (!isConnected || !canPushToTalk) {
+      return;
+    }
+    setIsRecording(true);
     const client = clientRef.current;
     const wavRecorder = wavRecorderRef.current;
     const wavStreamPlayer = wavStreamPlayerRef.current;
@@ -269,6 +280,9 @@ export function ConsolePage() {
    */
   const stopRecording = async () => {
     setIsRecording(false);
+    if (!isConnected || !canPushToTalk) {
+      return;
+    }
     const client = clientRef.current;
     const wavRecorder = wavRecorderRef.current;
     await wavRecorder.pause();
@@ -479,6 +493,55 @@ export function ConsolePage() {
       }
     );
 
+    client.addTool(
+      {
+        name: 'send_message_to_case',
+        description:
+          'Sends a user question to a case, logs it, retrieves an AI response, and logs the response.',
+        parameters: {
+          type: 'object',
+          properties: {
+            phone_number: {
+              type: 'string',
+              description: 'The Phone number of the case to interact with.',
+            },
+            question: {
+              type: 'string',
+              description: 'The question to ask the case.',
+            },
+          },
+          required: ['case_id', 'question'],
+        },
+      },
+      async ({ phone_number, question, location }: { [key: string]: any }) => {
+        if (!question || !phone_number) {
+          throw new Error('Both Phone Number and question are required.');
+        }
+    
+        try {
+          let response = await axiosInstance.post('/vLaw/chat_with_case', {
+            prompt: "User Input: `" + question,
+            phone_number: phone_number
+          });
+          // Check the API response for errors
+          const aiResponse = response?.data?.data?.text_response;
+          if (response?.data?.x !== 200 || aiResponse === 'An error occurred') {
+            throw new Error('Failed to process the message.');
+          }
+    
+          // Return the AI response
+          return {
+            question,
+            aiResponse
+          };
+        } catch (error) {
+          console.error('Error in send_message_to_case:', error);
+          throw error; // Re-throw the error to the caller
+        }
+      }
+    );
+    
+
     // handle realtime events from client + server for event logging
     client.on('realtime.event', (realtimeEvent: RealtimeEvent) => {
       setRealtimeEvents((realtimeEvents) => {
@@ -491,7 +554,7 @@ export function ConsolePage() {
           return realtimeEvents.concat(realtimeEvent);
         }
       });
-      if(realtimeEvent.event.type === 'response.done') {
+      if (realtimeEvent.event.type === 'response.done') {
         setUsage((usage) => {
           const u = realtimeEvent.event.response.usage;
           const input_audio_tokens = u.input_token_details.audio_tokens;
@@ -499,9 +562,9 @@ export function ConsolePage() {
           const input_text_tokens = u.input_token_details.text_tokens;
           const output_text_tokens = u.output_token_details.text_tokens;
 
-          const currentCost = input_audio_tokens * 100 / 1000000 + 
-            output_audio_tokens * 200 / 1000000 + 
-            input_text_tokens * 5 / 1000000 + 
+          const currentCost = input_audio_tokens * 100 / 1000000 +
+            output_audio_tokens * 200 / 1000000 +
+            input_text_tokens * 5 / 1000000 +
             output_text_tokens * 20 / 1000000;
 
           return {
@@ -551,39 +614,108 @@ export function ConsolePage() {
    */
   return (
     <div data-component="ConsolePage">
-      <div className="content-top">
-        <div className="content-title">
-          <img src="/openai-logomark.svg" />
-          <span>realtime console</span>
+      <div
+        className="content-top"
+        style={{
+          backgroundColor: "black",
+        }}
+      >
+        <div
+          className="content-title"
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100px",
+            backgroundColor: "black",
+          }}
+        >
+          <span style={{ fontWeight: "bold", fontSize: "24px" }}>Visyfy</span>
+
         </div>
-        <div className="content-api-key">
-          {!LOCAL_RELAY_SERVER_URL && (
-            <Button
-              icon={Edit}
-              iconPosition="end"
-              buttonStyle="flush"
-              label={`api key: ${apiKey.slice(0, 3)}...`}
-              onClick={() => resetAPIKey()}
-            />
-          )}
+        <div className="content-actions">
+          <Toggle
+            defaultValue={false}
+            labels={['Push to Talk', 'Auto Detect Voice']}
+            values={['none', 'server_vad']}
+            onChange={(_, value) => changeTurnEndType(value)}
+
+          />
+          <div className="spacer" />
         </div>
+
       </div>
-      <div className="content-main">
-        <div className="content-logs">
-          <div className="content-block events">
-            <div className="visualization">
-              <div className="visualization-entry client">
-                <canvas ref={clientCanvasRef} />
-              </div>
-              <div className="visualization-entry server">
-                <canvas ref={serverCanvasRef} />
-              </div>
+      {!defaultView &&
+        <div
+          className="content-title"
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "calc(100% - 100px)",
+            background: !canPushToTalk && isConnected
+              ? `url(${rippleAnimationBlack}) no-repeat center center` // Set SVG as background when conditions are met
+              : undefined, // No background otherwise
+            backgroundSize: !canPushToTalk && isConnected ? "cover" : undefined,
+            backgroundColor: !(!canPushToTalk && isConnected) // Set black background only if no SVG background
+              ? "black"
+              : undefined,
+          }}
+        >{isConnected && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column", // Stack items vertically
+              alignItems: "center", // Center-align items horizontally
+              gap: "20px", // Space between the image and the button
+            }}
+          >
+            <div
+              style={{
+                display: "inline-block",
+                borderRadius: "50%",
+                boxShadow: "0 0 20px rgba(0, 0, 0, 0.5)",
+                overflow: "hidden",
+                width: "400px",
+                height: "400px",
+                cursor: !isConnected || !canPushToTalk ? "" : "pointer",
+                background: isRecording
+                  ? `url(${rippleAnimationBlack}) no-repeat center center`
+                  : visyfyIconHovered
+                    ? "#222222" // Grey hover effect
+                    : undefined,
+                backgroundSize: isRecording || visyfyIconHovered ? "cover" : undefined,
+              }}
+              onMouseEnter={() => {
+                if (canPushToTalk) setVisyfyIconHovered(true);
+              }}
+              onMouseLeave={() => {
+                if (canPushToTalk) setVisyfyIconHovered(false);
+              }}
+            >
+              <img
+                onMouseDown={startRecording}
+                onMouseUp={stopRecording}
+                src={visyfyLogo}
+                alt="Visyfy logo"
+                style={{ height: "100%", width: "100%", objectFit: "cover" }}
+              />
             </div>
-            <div className="content-block-title">events
-              <span className='cost'>${usage.cost.toFixed(2)}</span>
-            </div>
-            <div className="content-block-title">events</div>
-            <div className="content-block-body" ref={eventsScrollRef}>
+
+            <div
+              ref={eventsScrollRef}
+              style={{
+                maxHeight: "300px",
+                maxWidth: "500px",
+                overflow: "auto",
+                color: "#6e6e7f",
+                position: "relative",
+                flexGrow: 1,
+                padding: "8px 0",
+                paddingTop: "4px",
+                lineHeight: "1.2em",
+              }}
+            >
               {!realtimeEvents.length && `awaiting connection...`}
               {realtimeEvents.map((realtimeEvent, i) => {
                 const count = realtimeEvent.count;
@@ -614,30 +746,31 @@ export function ConsolePage() {
                         }}
                       >
                         <div
-                          className={`event-source ${
-                            event.type === 'error'
-                              ? 'error'
-                              : realtimeEvent.source
-                          }`}
+                          className={`event-source ${event.type === 'error'
+                            ? 'error'
+                            : realtimeEvent.source
+                            }`}
+                          style={{ color: 'white' }}
+
                         >
                           {realtimeEvent.source === 'client' ? (
                             <ArrowUp />
                           ) : (
                             <ArrowDown />
                           )}
-                          <span>
+                          <span style={{ color: 'white' }} >
                             {event.type === 'error'
                               ? 'error!'
                               : realtimeEvent.source}
                           </span>
                         </div>
-                        <div className="event-type">
+                        <div style={{ color: 'white' }} className="event-type">
                           {event.type}
                           {count && ` (${count})`}
                         </div>
                       </div>
                       {!!expandedEvents[event.event_id] && (
-                        <div className="event-payload">
+                        <div className="event-payload" style={{ color: 'white' }} >
                           {JSON.stringify(event, null, 2)}
                         </div>
                       )}
@@ -646,89 +779,28 @@ export function ConsolePage() {
                 );
               })}
             </div>
-          </div>
-          <div className="content-block conversation">
-            <div className="content-block-title">conversation</div>
-            <div className="content-block-body" data-conversation-content>
-              {!items.length && `awaiting connection...`}
-              {items.map((conversationItem, i) => {
-                return (
-                  <div className="conversation-item" key={conversationItem.id}>
-                    <div className={`speaker ${conversationItem.role || ''}`}>
-                      <div>
-                        {(
-                          conversationItem.role || conversationItem.type
-                        ).replaceAll('_', ' ')}
-                      </div>
-                      <div
-                        className="close"
-                        onClick={() =>
-                          deleteConversationItem(conversationItem.id)
-                        }
-                      >
-                        <X />
-                      </div>
-                    </div>
-                    <div className={`speaker-content`}>
-                      {/* tool response */}
-                      {conversationItem.type === 'function_call_output' && (
-                        <div>{conversationItem.formatted.output}</div>
-                      )}
-                      {/* tool call */}
-                      {!!conversationItem.formatted.tool && (
-                        <div>
-                          {conversationItem.formatted.tool.name}(
-                          {conversationItem.formatted.tool.arguments})
-                        </div>
-                      )}
-                      {!conversationItem.formatted.tool &&
-                        conversationItem.role === 'user' && (
-                          <div>
-                            {conversationItem.formatted.transcript ||
-                              (conversationItem.formatted.audio?.length
-                                ? '(awaiting transcript)'
-                                : conversationItem.formatted.text ||
-                                  '(item sent)')}
-                          </div>
-                        )}
-                      {!conversationItem.formatted.tool &&
-                        conversationItem.role === 'assistant' && (
-                          <div>
-                            {conversationItem.formatted.transcript ||
-                              conversationItem.formatted.text ||
-                              '(truncated)'}
-                          </div>
-                        )}
-                      {conversationItem.formatted.file && (
-                        <audio
-                          src={conversationItem.formatted.file.url}
-                          controls
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="content-actions">
-            <Toggle
-              defaultValue={false}
-              labels={['manual', 'vad']}
-              values={['none', 'server_vad']}
-              onChange={(_, value) => changeTurnEndType(value)}
+            <Button
+              label={isConnected ? "disconnect" : "connect"}
+              iconPosition={isConnected ? "end" : "start"}
+              icon={isConnected ? X : Zap}
+              buttonStyle={isConnected ? "regular" : "action"}
+              onClick={isConnected ? disconnectConversation : connectConversation}
+              style={{
+                fontSize: "20px", // Larger text
+                padding: "16px 22px", // Larger padding
+                backgroundColor: "black", // Black background
+                color: "blue", // Blue text
+                border: "2px solid blue", // Blue outline
+                borderRadius: "8px", // Optional: rounded corners
+                cursor: "pointer", // Pointer cursor for better UX
+              }}
             />
-            <div className="spacer" />
-            {isConnected && canPushToTalk && (
-              <Button
-                label={isRecording ? 'release to send' : 'push to talk'}
-                buttonStyle={isRecording ? 'alert' : 'regular'}
-                disabled={!isConnected || !canPushToTalk}
-                onMouseDown={startRecording}
-                onMouseUp={stopRecording}
-              />
-            )}
-            <div className="spacer" />
+
+          </div>
+        )}
+
+
+          {!isConnected &&
             <Button
               label={isConnected ? 'disconnect' : 'connect'}
               iconPosition={isConnected ? 'end' : 'start'}
@@ -737,10 +809,193 @@ export function ConsolePage() {
               onClick={
                 isConnected ? disconnectConversation : connectConversation
               }
+              style={{
+                fontSize: "20px", // Larger text
+                padding: "16px 22px", // Larger padding
+                backgroundColor: "black", // Black background
+                color: "blue", // Blue text
+                border: "2px solid blue", // Blue outline
+                borderRadius: "8px", // Optional: rounded corners
+                cursor: "pointer", // Pointer cursor for better UX
+              }}
             />
-          </div>
+
+          }
         </div>
-        <div className="content-right">
+      }
+      {defaultView &&
+        <div className="content-main">
+          <div className="content-logs">
+            <div className="content-block events">
+              <div className="visualization">
+                <div className="visualization-entry client">
+                  <canvas ref={clientCanvasRef} />
+                </div>
+                <div className="visualization-entry server">
+                  <canvas ref={serverCanvasRef} />
+                </div>
+              </div>
+              <div className="content-block-title">events
+                <span className='cost'>${usage.cost.toFixed(2)}</span>
+              </div>
+              <div className="content-block-title">events</div>
+              <div className="content-block-body" ref={eventsScrollRef}>
+                {!realtimeEvents.length && `awaiting connection...`}
+                {realtimeEvents.map((realtimeEvent, i) => {
+                  const count = realtimeEvent.count;
+                  const event = { ...realtimeEvent.event };
+                  if (event.type === 'input_audio_buffer.append') {
+                    event.audio = `[trimmed: ${event.audio.length} bytes]`;
+                  } else if (event.type === 'response.audio.delta') {
+                    event.delta = `[trimmed: ${event.delta.length} bytes]`;
+                  }
+                  return (
+                    <div className="event" key={event.event_id}>
+                      <div className="event-timestamp">
+                        {formatTime(realtimeEvent.time)}
+                      </div>
+                      <div className="event-details">
+                        <div
+                          className="event-summary"
+                          onClick={() => {
+                            // toggle event details
+                            const id = event.event_id;
+                            const expanded = { ...expandedEvents };
+                            if (expanded[id]) {
+                              delete expanded[id];
+                            } else {
+                              expanded[id] = true;
+                            }
+                            setExpandedEvents(expanded);
+                          }}
+                        >
+                          <div
+                            className={`event-source ${event.type === 'error'
+                              ? 'error'
+                              : realtimeEvent.source
+                              }`}
+                          >
+                            {realtimeEvent.source === 'client' ? (
+                              <ArrowUp />
+                            ) : (
+                              <ArrowDown />
+                            )}
+                            <span>
+                              {event.type === 'error'
+                                ? 'error!'
+                                : realtimeEvent.source}
+                            </span>
+                          </div>
+                          <div className="event-type">
+                            {event.type}
+                            {count && ` (${count})`}
+                          </div>
+                        </div>
+                        {!!expandedEvents[event.event_id] && (
+                          <div className="event-payload">
+                            {JSON.stringify(event, null, 2)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="content-block conversation">
+              <div className="content-block-title">conversation</div>
+              <div className="content-block-body" data-conversation-content>
+                {!items.length && `awaiting connection...`}
+                {items.map((conversationItem, i) => {
+                  return (
+                    <div className="conversation-item" key={conversationItem.id}>
+                      <div className={`speaker ${conversationItem.role || ''}`}>
+                        <div>
+                          {(
+                            conversationItem.role || conversationItem.type
+                          ).replaceAll('_', ' ')}
+                        </div>
+                        <div
+                          className="close"
+                          onClick={() =>
+                            deleteConversationItem(conversationItem.id)
+                          }
+                        >
+                          <X />
+                        </div>
+                      </div>
+                      <div className={`speaker-content`}>
+                        {/* tool response */}
+                        {conversationItem.type === 'function_call_output' && (
+                          <div>{conversationItem.formatted.output}</div>
+                        )}
+                        {/* tool call */}
+                        {!!conversationItem.formatted.tool && (
+                          <div>
+                            {conversationItem.formatted.tool.name}(
+                            {conversationItem.formatted.tool.arguments})
+                          </div>
+                        )}
+                        {!conversationItem.formatted.tool &&
+                          conversationItem.role === 'user' && (
+                            <div>
+                              {conversationItem.formatted.transcript ||
+                                (conversationItem.formatted.audio?.length
+                                  ? '(awaiting transcript)'
+                                  : conversationItem.formatted.text ||
+                                  '(item sent)')}
+                            </div>
+                          )}
+                        {!conversationItem.formatted.tool &&
+                          conversationItem.role === 'assistant' && (
+                            <div>
+                              {conversationItem.formatted.transcript ||
+                                conversationItem.formatted.text ||
+                                '(truncated)'}
+                            </div>
+                          )}
+                        {conversationItem.formatted.file && (
+                          <audio
+                            src={conversationItem.formatted.file.url}
+                            controls
+                          />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="content-actions">
+              <Toggle
+                defaultValue={false}
+                labels={['manual', 'vad']}
+                values={['none', 'server_vad']}
+                onChange={(_, value) => changeTurnEndType(value)}
+              />
+              <div className="spacer" />
+              {isConnected && canPushToTalk && (
+                <Button
+                  label={isRecording ? 'release to send' : 'push to talk'}
+                  buttonStyle={isRecording ? 'alert' : 'regular'}
+                  disabled={!isConnected || !canPushToTalk}
+                  onMouseDown={startRecording}
+                  onMouseUp={stopRecording}
+                />
+              )}
+              <div className="spacer" />
+              <Button
+                label={isConnected ? 'disconnect' : 'connect'}
+                iconPosition={isConnected ? 'end' : 'start'}
+                icon={isConnected ? X : Zap}
+                buttonStyle={isConnected ? 'regular' : 'action'}
+                onClick={
+                  isConnected ? disconnectConversation : connectConversation
+                }
+              />
+            </div>
+          </div>
+          {/* <div className="content-right">
           <div className="content-block map">
             <div className="content-block-title">get_weather()</div>
             <div className="content-block-title bottom">
@@ -773,8 +1028,8 @@ export function ConsolePage() {
               {JSON.stringify(memoryKv, null, 2)}
             </div>
           </div>
-        </div>
-      </div>
+        </div> */}
+        </div>}
     </div>
   );
 }
